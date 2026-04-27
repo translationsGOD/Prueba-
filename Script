@@ -1,0 +1,119 @@
+// seed.js
+import { faker } from '@faker-js/faker';
+import mysql from 'mysql2/promise';
+
+faker.seed(42); // reproducible
+
+const db = await mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: 'tu_password',
+  database: 'db_spotify',
+});
+
+// ── 1. AUTORES ────────────────────────────────────────
+const autores = Array.from({ length: 20 }, (_, i) => ({
+  id_autor: i + 1,
+  nombre: faker.person.fullName(),
+}));
+
+await db.query(
+  'INSERT INTO autores (id_autor, nombre) VALUES ?',
+  [autores.map(a => [a.id_autor, a.nombre])]
+);
+console.log('✅ Autores insertados');
+
+// ── 2. CANCIONES ──────────────────────────────────────
+const canciones = Array.from({ length: 60 }, (_, i) => ({
+  id_cancion: i + 1,
+  titulo: faker.music.songName(),
+  id_autor: faker.helpers.arrayElement(autores).id_autor,
+}));
+
+await db.query(
+  'INSERT INTO canciones (id_cancion, titulo, id_autor) VALUES ?',
+  [canciones.map(c => [c.id_cancion, c.titulo, c.id_autor])]
+);
+console.log('✅ Canciones insertadas');
+
+// ── 3. USUARIOS ───────────────────────────────────────
+const usuarios = Array.from({ length: 30 }, (_, i) => ({
+  id_usuario: i + 1,
+  nombre: faker.internet.username(),
+}));
+
+await db.query(
+  'INSERT INTO usuarios (id_usuario, nombre) VALUES ?',
+  [usuarios.map(u => [u.id_usuario, u.nombre])]
+);
+console.log('✅ Usuarios insertados');
+
+// ── 4. PLAYLIST ───────────────────────────────────────
+const playlists = Array.from({ length: 40 }, (_, i) => ({
+  id_playlist: i + 1,
+  id_usuario: faker.helpers.arrayElement(usuarios).id_usuario,
+  id_cancion: faker.helpers.arrayElement(canciones).id_cancion,
+}));
+
+await db.query(
+  'INSERT INTO playlist (id_playlist, id_usuario, id_cancion) VALUES ?',
+  [playlists.map(p => [p.id_playlist, p.id_usuario, p.id_cancion])]
+);
+console.log('✅ Playlists insertadas');
+
+// ── 5. PLAYLIST_CANCIONES ─────────────────────────────
+// Evitar duplicados con un Set
+const pcSet = new Set();
+const playlistCanciones = [];
+
+while (playlistCanciones.length < 100) {
+  const id_playlist = faker.helpers.arrayElement(playlists).id_playlist;
+  const id_cancion  = faker.helpers.arrayElement(canciones).id_cancion;
+  const key = `${id_playlist}-${id_cancion}`;
+  if (!pcSet.has(key)) {
+    pcSet.add(key);
+    playlistCanciones.push([id_playlist, id_cancion]);
+  }
+}
+
+await db.query(
+  'INSERT INTO playlist_canciones (id_playlist, id_cancion) VALUES ?',
+  [playlistCanciones]
+);
+console.log('✅ Playlist_canciones insertadas');
+
+// ── 6. LIKES ──────────────────────────────────────────
+const likesSet = new Set();
+const likes = [];
+
+while (likes.length < 80) {
+  const id_usuario = faker.helpers.arrayElement(usuarios).id_usuario;
+  const id_cancion = faker.helpers.arrayElement(canciones).id_cancion;
+  const key = `${id_usuario}-${id_cancion}`;
+  if (!likesSet.has(key)) {
+    likesSet.add(key);
+    likes.push([id_usuario, id_cancion]);
+  }
+}
+
+await db.query(
+  'INSERT INTO likes (id_usuario, id_cancion) VALUES ?',
+  [likes]
+);
+console.log('✅ Likes insertados');
+
+// ── 7. VIEWS ──────────────────────────────────────────
+const views = Array.from({ length: 150 }, (_, i) => [
+  i + 1,
+  faker.helpers.arrayElement(canciones).id_cancion,
+  faker.date.between({ from: '2020-01-01', to: new Date() }),
+]);
+
+await db.query(
+  'INSERT INTO views (id, id_cancion, fecha_lanzamiento) VALUES ?',
+  [views]
+);
+console.log('✅ Views insertadas');
+
+await db.end();
+console.log('🎵 Seed completo!');
